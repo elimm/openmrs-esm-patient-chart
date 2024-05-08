@@ -33,11 +33,12 @@ import {
   type Visit,
   updateVisit,
   useConnectivity,
+  formatDatetime,
 } from '@openmrs/esm-framework';
 import {
   convertTime12to24,
   createOfflineVisitForPatient,
-  type DefaultWorkspaceProps,
+  type DefaultPatientWorkspaceProps,
   time12HourFormatRegex,
   useActivePatientEnrollment,
 } from '@openmrs/esm-patient-common-lib';
@@ -55,8 +56,11 @@ import { type VisitFormData } from './visit-form.resource';
 import VisitDateTimeField from './visit-date-time.component';
 import { useVisits } from '../visits-widget/visit.resource';
 import { useOfflineVisitType } from '../hooks/useOfflineVisitType';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 
-interface StartVisitFormProps extends DefaultWorkspaceProps {
+dayjs.extend(isSameOrBefore);
+
+interface StartVisitFormProps extends DefaultPatientWorkspaceProps {
   visitToEdit?: Visit;
   showVisitEndDateTimeFields: boolean;
 }
@@ -116,7 +120,19 @@ const StartVisitForm: React.FC<StartVisitFormProps> = ({
     );
 
     return z.object({
-      visitStartDate: z.date(),
+      visitStartDate: z.date().refine(
+        (value) => {
+          const today = dayjs();
+          const startDate = dayjs(value);
+          return displayVisitStopDateTimeFields ? true : startDate.isSameOrBefore(today, 'day');
+        },
+        t('invalidVisitStartDate', 'Start date needs to be on or before {{firstEncounterDatetime}}', {
+          firstEncounterDatetime: formatDatetime(new Date()),
+          interpolation: {
+            escapeValue: false,
+          },
+        }),
+      ),
       visitStartTime: z
         .string()
         .refine((value) => value.match(time12HourFormatRegex), t('invalidTimeFormat', 'Invalid time format')),
